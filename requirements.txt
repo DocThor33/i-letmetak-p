@@ -4,5 +4,4 @@ numpy
 google-generativeai
 openpyxl
 Pillow
-reportlabgit 
-
+reportlab

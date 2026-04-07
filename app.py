@@ -12,31 +12,24 @@ from datetime import datetime
 import calendar
 
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport="rest")
 @st.cache_resource
 def model_tespit_et():
     try:
-        # Hesabındaki tüm modelleri listele
-        modeller = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # En iyiden başlayarak dene 
-
+        # list_models bazen metadata hatası verebiliyor; sabit fallback zinciri daha güvenli.
         oncelik = [
             'gemini-1.5-flash',
             'gemini-1.5-pro',
             'gemini-1.0-pro'
         ]
 
-        secilen_isim = None
         for m_adi in oncelik:
-            if m_adi in modeller:
-                secilen_isim = m_adi
-                break
+            try:
+                return genai.GenerativeModel(m_adi), m_adi
+            except Exception:
+                continue
 
-        if not secilen_isim:
-            secilen_isim = modeller[0]
-
-        return genai.GenerativeModel(secilen_isim), secilen_isim
+        return None, "Uygun model bulunamadi. API anahtari/model yetkilerini kontrol et."
 
     except Exception as e:
         return None, f"Hata: {e}"
@@ -303,6 +296,8 @@ if sayfa == "📝 Fatura Yükle":
     if st.button("🚀 Faturayı Analiz Et"):
         if uploaded_file is None:
             st.warning("Lütfen önce bir fatura yükle.")
+        elif model is None:
+            st.error("AI modeli hazir degil. API anahtarini ve model erisimini kontrol edin.")
         else:
             with st.spinner('Yapay zeka analiz ediyor...'):
                 ...

@@ -19,24 +19,25 @@ def model_tespit_et():
         # Hesabındaki tüm modelleri listele
         modeller = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # En iyiden başlayarak dene
+        # En iyiden başlayarak dene 
+
         oncelik = [
-            'models/gemini-1.5-flash', 
-            'models/gemini-1.5-pro', 
-            'models/gemini-pro-vision',
-            'models/gemini-1.0-pro'
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-1.0-pro'
         ]
-        
-        secilen_isime = None
+
+        secilen_isim = None
         for m_adi in oncelik:
             if m_adi in modeller:
-                secilen_isime = m_adi
+                secilen_isim = m_adi
                 break
-        
-        if not secilen_isime:
-            secilen_isime = modeller[0]
-            
-        return genai.GenerativeModel(secilen_isime), secilen_isime
+
+        if not secilen_isim:
+            secilen_isim = modeller[0]
+
+        return genai.GenerativeModel(secilen_isim), secilen_isim
+
     except Exception as e:
         return None, f"Hata: {e}"
 

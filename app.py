@@ -12,7 +12,6 @@ from datetime import datetime
 import calendar
 
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
-API_KEY = st.secrets["API_KEY"]
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 @st.cache_resource
 def model_tespit_et():

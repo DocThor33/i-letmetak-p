@@ -18,11 +18,13 @@ APP_BUILD = "2026-04-11-2"
 
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
 # REST yolundaki latin-1 header sorunlarina karsi once gRPC dene, olmazsa varsayilana don.
+API_KEY = st.secrets.get("GOOGLE_API_KEY", "")
+
 try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport="grpc")
+    genai.configure(api_key=API_KEY, transport="grpc")
     GENAI_TRANSPORT = "grpc"
 except Exception:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    genai.configure(api_key=API_KEY)
     GENAI_TRANSPORT = "default"
 @st.cache_resource
 def model_tespit_et():
@@ -360,9 +362,12 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
                 st.session_state['onay_bekleyen'] = df_temp
             except Exception as e:
                 err_text = str(e)
-                if "API key was reported as leaked" in err_text:
+                err_lower = err_text.lower()
+                if "api_key_invalid" in err_lower or "api key not valid" in err_lower or "invalid api key" in err_lower:
+                    st.error("API key gecersiz. Streamlit Secrets'taki GOOGLE_API_KEY degerini gercek ve aktif bir Gemini API key ile guncelle.")
+                elif "api key was reported as leaked" in err_lower:
                     st.error("Google API key guvenlik nedeniyle devre disi kalmis. Streamlit Secrets'ta yeni API key tanimlayip yeniden deploy etmelisin.")
-                elif "latin-1" in err_text:
+                elif "latin-1" in err_lower:
                     st.error("Unicode/language kaynakli header encoding hatasi olustu. Yeni API key ile tekrar dene ve dosya adini ASCII karakterlerle yukle (or: fatura_01.jpg).")
                 else:
                     st.error(f"Analiz sırasında hata: {e}")

@@ -53,7 +53,18 @@ model, aktif_surum = model_tespit_et()
 
 def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
     """SDK'nin header encoding hatalarina karsi dogrudan REST cagrisi."""
-    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+    base_model = (model_name or "gemini-1.5-flash").replace("models/", "")
+    model_candidates = [base_model]
+    alias_map = {
+        "gemini-1.5-flash": ["gemini-1.5-flash-latest", "gemini-1.5-flash-002", "gemini-1.5-flash-8b-latest"],
+        "gemini-1.5-pro": ["gemini-1.5-pro-latest", "gemini-1.5-pro-002"],
+        "gemini-1.0-pro": ["gemini-1.0-pro-latest"],
+    }
+    model_candidates.extend(alias_map.get(base_model, []))
+
+    # Duplicates'i korumadan temizle
+    model_candidates = list(dict.fromkeys(model_candidates))
+
     payload = {
         "contents": [
             {
@@ -70,21 +81,32 @@ def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
         ]
     }
 
-    resp = requests.post(endpoint, headers={"Content-Type": "application/json"}, json=payload, timeout=60)
-    if resp.status_code != 200:
-        raise Exception(f"Gemini REST HTTP {resp.status_code}: {resp.text[:500]}")
+    last_404 = None
+    for api_version in ["v1beta", "v1"]:
+        for candidate in model_candidates:
+            endpoint = f"https://generativelanguage.googleapis.com/{api_version}/models/{candidate}:generateContent?key={API_KEY}"
+            resp = requests.post(endpoint, headers={"Content-Type": "application/json"}, json=payload, timeout=60)
 
-    body = resp.json()
-    candidates = body.get("candidates", [])
-    if not candidates:
-        raise Exception(f"Gemini REST bos aday dondu: {body}")
+            if resp.status_code == 404:
+                last_404 = f"{api_version}/{candidate}: {resp.text[:250]}"
+                continue
 
-    parts = candidates[0].get("content", {}).get("parts", [])
-    text_chunks = [p.get("text", "") for p in parts if "text" in p]
-    result = "\n".join([t for t in text_chunks if t]).strip()
-    if not result:
-        raise Exception(f"Gemini REST metin dondurmedi: {body}")
-    return result
+            if resp.status_code != 200:
+                raise Exception(f"Gemini REST HTTP {resp.status_code}: {resp.text[:500]}")
+
+            body = resp.json()
+            candidates = body.get("candidates", [])
+            if not candidates:
+                raise Exception(f"Gemini REST bos aday dondu: {body}")
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+            text_chunks = [p.get("text", "") for p in parts if "text" in p]
+            result = "\n".join([t for t in text_chunks if t]).strip()
+            if not result:
+                raise Exception(f"Gemini REST metin dondurmedi: {body}")
+            return result
+
+    raise Exception(f"Gemini REST uygun model bulunamadi. Son 404: {last_404}")
 
 # --- 2. VERİTABANI İŞLEMLERİ ---
 def ay_bul(tarih_str):

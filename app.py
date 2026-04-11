@@ -17,8 +17,13 @@ import traceback
 APP_BUILD = "2026-04-11-2"
 
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
-# transport parametresini sabitlememek, istemciye uygun yiginin secilmesini saglar.
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# REST yolundaki latin-1 header sorunlarina karsi once gRPC dene, olmazsa varsayilana don.
+try:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport="grpc")
+    GENAI_TRANSPORT = "grpc"
+except Exception:
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    GENAI_TRANSPORT = "default"
 @st.cache_resource
 def model_tespit_et():
     try:
@@ -185,7 +190,7 @@ veritabani_kur()
 
 # --- 3. ARAYÜZ ---
 st.set_page_config(page_title="Sote Pilav Muhasebe", layout="wide")
-st.sidebar.caption(f"Build: {APP_BUILD}")
+st.sidebar.caption(f"Build: {APP_BUILD} | Transport: {GENAI_TRANSPORT}")
 
 # Hangi sürümün çalıştığını burada gösteriyoruz
 if "Hata" in aktif_surum:
@@ -354,7 +359,13 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
                 df_temp = pd.DataFrame(data_lines, columns=["firma", "tarih", "kategori", "kalem", "miktar", "birim_fiyat", "toplam_fiyat"])
                 st.session_state['onay_bekleyen'] = df_temp
             except Exception as e:
-                st.error(f"Analiz sırasında hata: {e}")
+                err_text = str(e)
+                if "API key was reported as leaked" in err_text:
+                    st.error("Google API key guvenlik nedeniyle devre disi kalmis. Streamlit Secrets'ta yeni API key tanimlayip yeniden deploy etmelisin.")
+                elif "latin-1" in err_text:
+                    st.error("Unicode/language kaynakli header encoding hatasi olustu. Yeni API key ile tekrar dene ve dosya adini ASCII karakterlerle yukle (or: fatura_01.jpg).")
+                else:
+                    st.error(f"Analiz sırasında hata: {e}")
                 with st.expander("Teknik hata detayi"):
                     st.code(traceback.format_exc())
     

@@ -11,3 +11,4 @@ venv/
 Harcamalar_*.xlsx
 SOTE 2.*/
 *.prproj
+.streamlit/secrets.toml

@@ -10,12 +10,15 @@ from reportlab.lib.styles import getSampleStyleSheet # type: ignore
 from openpyxl.styles import Font, PatternFill, Alignment # type: ignore
 from datetime import datetime
 import calendar
+import tempfile
+import traceback
 
 # Her deployda surumu takip etmek icin gorunen build etiketi.
 APP_BUILD = "2026-04-11-2"
 
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport="rest")
+# transport parametresini sabitlememek, istemciye uygun yiginin secilmesini saglar.
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 @st.cache_resource
 def model_tespit_et():
     try:
@@ -322,10 +325,24 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
             try:
                 # Dosya adindaki ozel karakterlerden etkilenmemek icin gorseli ham byte olarak gonder.
                 mime_type = uploaded_file.type or "image/jpeg"
-                response = model.generate_content([
-                    prompt,
-                    {"inline_data": {"mime_type": mime_type, "data": image_bytes}}
-                ])
+                try:
+                    response = model.generate_content([
+                        prompt,
+                        {"inline_data": {"mime_type": mime_type, "data": image_bytes}}
+                    ])
+                except UnicodeEncodeError:
+                    # Bazi ortamlarda REST yolu Unicode dosya adlarinda encode hatasi verebilir.
+                    image_rgb = image.convert("RGB")
+                    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                        image_rgb.save(tmp, format="JPEG", quality=90)
+                        tmp_path = tmp.name
+                    try:
+                        uploaded_media = genai.upload_file(path=tmp_path, display_name="invoice.jpg")
+                        response = model.generate_content([prompt, uploaded_media])
+                    finally:
+                        if os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+
                 raw_text = response.text.strip().replace("```csv", "").replace("```", "").strip()
                 data_lines = []
                 for l in raw_text.split('\n'):
@@ -338,6 +355,8 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
                 st.session_state['onay_bekleyen'] = df_temp
             except Exception as e:
                 st.error(f"Analiz sırasında hata: {e}")
+                with st.expander("Teknik hata detayi"):
+                    st.code(traceback.format_exc())
     
     # Analiz sonucu düzenleme bölümü - sadece bu sayfada göster
     if 'onay_bekleyen' in st.session_state:

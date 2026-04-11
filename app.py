@@ -54,16 +54,37 @@ model, aktif_surum = model_tespit_et()
 def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
     """SDK'nin header encoding hatalarina karsi dogrudan REST cagrisi."""
     base_model = (model_name or "gemini-1.5-flash").replace("models/", "")
-    model_candidates = [base_model]
-    alias_map = {
-        "gemini-1.5-flash": ["gemini-1.5-flash-latest", "gemini-1.5-flash-002", "gemini-1.5-flash-8b-latest"],
-        "gemini-1.5-pro": ["gemini-1.5-pro-latest", "gemini-1.5-pro-002"],
-        "gemini-1.0-pro": ["gemini-1.0-pro-latest"],
-    }
-    model_candidates.extend(alias_map.get(base_model, []))
 
-    # Duplicates'i korumadan temizle
-    model_candidates = list(dict.fromkeys(model_candidates))
+    def _list_models(api_version):
+        endpoint = f"https://generativelanguage.googleapis.com/{api_version}/models?key={API_KEY}"
+        resp = requests.get(endpoint, timeout=30)
+        if resp.status_code != 200:
+            return []
+
+        items = resp.json().get("models", [])
+        available = []
+        for item in items:
+            name = item.get("name", "").replace("models/", "")
+            methods = item.get("supportedGenerationMethods", [])
+            if name and "generateContent" in methods:
+                available.append(name)
+        return available
+
+    def _rank_models(models, preferred):
+        # Tercih sirasi: birebir model > flash > pro > diger
+        if not models:
+            return []
+
+        def score(m):
+            if m == preferred:
+                return 0
+            if "flash" in m:
+                return 1
+            if "pro" in m:
+                return 2
+            return 3
+
+        return sorted(models, key=lambda m: (score(m), m))
 
     payload = {
         "contents": [
@@ -83,6 +104,9 @@ def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
 
     last_404 = None
     for api_version in ["v1beta", "v1"]:
+        discovered_models = _rank_models(_list_models(api_version), base_model)
+        model_candidates = discovered_models if discovered_models else [base_model]
+
         for candidate in model_candidates:
             endpoint = f"https://generativelanguage.googleapis.com/{api_version}/models/{candidate}:generateContent?key={API_KEY}"
             resp = requests.post(endpoint, headers={"Content-Type": "application/json"}, json=payload, timeout=60)

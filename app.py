@@ -285,9 +285,12 @@ if st.session_state.get('delete_confirm', False):
 if sayfa == "📝 Fatura Yükle":
     st.title("📝 Fatura Yükle")
     uploaded_file = st.file_uploader("Fatura Fotoğrafı Yükle", type=["jpg", "jpeg", "png"])
+    image = None
+    image_bytes = None
 
     if uploaded_file:
-        image = Image.open(uploaded_file)
+        image_bytes = uploaded_file.getvalue()
+        image = Image.open(io.BytesIO(image_bytes))
         col1, col2 = st.columns(2)
         
         with col1:
@@ -312,13 +315,18 @@ Format:
 Firma;Tarih;Kategori;Kalem;Miktar;BirimFiyat;Toplam
 """
             try:
-                response = model.generate_content([prompt, image])
+                # Dosya adindaki ozel karakterlerden etkilenmemek icin gorseli ham byte olarak gonder.
+                mime_type = uploaded_file.type or "image/jpeg"
+                response = model.generate_content([
+                    prompt,
+                    {"mime_type": mime_type, "data": image_bytes}
+                ])
                 raw_text = response.text.strip().replace("```csv", "").replace("```", "").strip()
                 data_lines = []
                 for l in raw_text.split('\n'):
-                   parts = l.split(';')
-                if len(parts) == 7:
-                 data_lines.append(parts)
+                    parts = l.split(';')
+                    if len(parts) == 7:
+                        data_lines.append(parts)
                 
                 # Sütun isimlerini biz el ile (sabit) veriyoruz:
                 df_temp = pd.DataFrame(data_lines, columns=["firma", "tarih", "kategori", "kalem", "miktar", "birim_fiyat", "toplam_fiyat"])

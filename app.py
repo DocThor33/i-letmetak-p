@@ -5,12 +5,13 @@ from PIL import Image
 import io
 import sqlite3
 import os
+import base64
+import requests
 from reportlab.platypus import SimpleDocTemplate, Paragraph # type: ignore
 from reportlab.lib.styles import getSampleStyleSheet # type: ignore
 from openpyxl.styles import Font, PatternFill, Alignment # type: ignore
 from datetime import datetime
 import calendar
-import tempfile
 import traceback
 
 # Her deployda surumu takip etmek icin gorunen build etiketi.
@@ -49,6 +50,41 @@ def model_tespit_et():
 
 # Modeli ve ismini belirle
 model, aktif_surum = model_tespit_et()
+
+def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
+    """SDK'nin header encoding hatalarina karsi dogrudan REST cagrisi."""
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt},
+                    {
+                        "inline_data": {
+                            "mime_type": mime_type,
+                            "data": base64.b64encode(image_bytes).decode("ascii")
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    resp = requests.post(endpoint, headers={"Content-Type": "application/json"}, json=payload, timeout=60)
+    if resp.status_code != 200:
+        raise Exception(f"Gemini REST HTTP {resp.status_code}: {resp.text[:500]}")
+
+    body = resp.json()
+    candidates = body.get("candidates", [])
+    if not candidates:
+        raise Exception(f"Gemini REST bos aday dondu: {body}")
+
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text_chunks = [p.get("text", "") for p in parts if "text" in p]
+    result = "\n".join([t for t in text_chunks if t]).strip()
+    if not result:
+        raise Exception(f"Gemini REST metin dondurmedi: {body}")
+    return result
 
 # --- 2. VERİTABANI İŞLEMLERİ ---
 def ay_bul(tarih_str):
@@ -337,20 +373,14 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
                         prompt,
                         {"inline_data": {"mime_type": mime_type, "data": image_bytes}}
                     ])
-                except UnicodeEncodeError:
-                    # Bazi ortamlarda REST yolu Unicode dosya adlarinda encode hatasi verebilir.
-                    image_rgb = image.convert("RGB")
-                    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-                        image_rgb.save(tmp, format="JPEG", quality=90)
-                        tmp_path = tmp.name
-                    try:
-                        uploaded_media = genai.upload_file(path=tmp_path, display_name="invoice.jpg")
-                        response = model.generate_content([prompt, uploaded_media])
-                    finally:
-                        if os.path.exists(tmp_path):
-                            os.remove(tmp_path)
+                    raw_text = response.text.strip().replace("```csv", "").replace("```", "").strip()
+                except Exception as sdk_err:
+                    if "latin-1" in str(sdk_err).lower():
+                        raw_text = gemini_generate_via_rest(prompt, image_bytes, mime_type, aktif_surum)
+                        raw_text = raw_text.replace("```csv", "").replace("```", "").strip()
+                    else:
+                        raise
 
-                raw_text = response.text.strip().replace("```csv", "").replace("```", "").strip()
                 data_lines = []
                 for l in raw_text.split('\n'):
                     parts = l.split(';')

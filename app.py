@@ -319,7 +319,7 @@ Firma;Tarih;Kategori;Kalem;Miktar;BirimFiyat;Toplam
                 mime_type = uploaded_file.type or "image/jpeg"
                 response = model.generate_content([
                     prompt,
-                    {"mime_type": mime_type, "data": image_bytes}
+                    {"inline_data": {"mime_type": mime_type, "data": image_bytes}}
                 ])
                 raw_text = response.text.strip().replace("```csv", "").replace("```", "").strip()
                 data_lines = []

@@ -309,14 +309,15 @@ if sayfa == "📝 Fatura Yükle":
             with st.spinner('Yapay zeka analiz ediyor...'):
                 ...
             prompt = """
-Bu bir fatura görselidir.
+This is an invoice image.
 
-Kurallar:
-- SADECE ; kullan
-- Açıklama yazma
+Rules:
+- Use only semicolon (; ) as separator
+- Do not add explanations
+- Return rows only
 
 Format:
-Firma;Tarih;Kategori;Kalem;Miktar;BirimFiyat;Toplam
+Company;Date;Category;Item;Quantity;UnitPrice;Total
 """
             try:
                 # Dosya adindaki ozel karakterlerden etkilenmemek icin gorseli ham byte olarak gonder.

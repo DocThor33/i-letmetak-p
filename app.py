@@ -11,6 +11,9 @@ from openpyxl.styles import Font, PatternFill, Alignment # type: ignore
 from datetime import datetime
 import calendar
 
+# Her deployda surumu takip etmek icin gorunen build etiketi.
+APP_BUILD = "2026-04-11-2"
+
 # --- 1. YENİ API KEY VE DİNAMİK MODEL SEÇİCİ ---
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], transport="rest")
 @st.cache_resource
@@ -179,6 +182,7 @@ veritabani_kur()
 
 # --- 3. ARAYÜZ ---
 st.set_page_config(page_title="Sote Pilav Muhasebe", layout="wide")
+st.sidebar.caption(f"Build: {APP_BUILD}")
 
 # Hangi sürümün çalıştığını burada gösteriyoruz
 if "Hata" in aktif_surum:

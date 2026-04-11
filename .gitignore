@@ -8,3 +8,6 @@ env/
 venv/
 .env
 .DS_Store
+Harcamalar_*.xlsx
+SOTE 2.*/
+*.prproj

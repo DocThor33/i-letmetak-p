@@ -301,7 +301,7 @@ if sayfa == "📝 Fatura Yükle":
         col1, col2 = st.columns(2)
         
         with col1:
-            st.image(image, use_container_width=True)
+            st.image(image, width='stretch')
         
     if st.button("🚀 Faturayı Analiz Et"):
         if uploaded_file is None:
@@ -363,7 +363,7 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
         st.subheader("📋 Analiz Sonucu (Düzenlemek için hücrelere tıklayabilirsin)")
         
         # Düzenlenebilir tablo
-        duzenlenmis_df = st.data_editor(st.session_state['onay_bekleyen'], use_container_width=True, num_rows="dynamic")
+        duzenlenmis_df = st.data_editor(st.session_state['onay_bekleyen'], width='stretch', num_rows="dynamic")
         
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -475,4 +475,4 @@ elif sayfa == "🧾 Komisyon Hesapla":
 
 elif sayfa == "📚 Tüm Veriler":
     st.title(f"📚 {calendar.month_name[secilen_ay_num]} {secilen_yil} Faturaları")
-    st.dataframe(birikmis_veri, use_container_width=True)
+    st.dataframe(birikmis_veri, width='stretch')

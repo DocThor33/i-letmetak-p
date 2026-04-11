@@ -115,6 +115,9 @@ def gemini_generate_via_rest(prompt, image_bytes, mime_type, model_name):
                 last_404 = f"{api_version}/{candidate}: {resp.text[:250]}"
                 continue
 
+            if resp.status_code == 429:
+                raise Exception(f"GEMINI_QUOTA_EXCEEDED: {resp.text[:500]}")
+
             if resp.status_code != 200:
                 raise Exception(f"Gemini REST HTTP {resp.status_code}: {resp.text[:500]}")
 
@@ -443,6 +446,8 @@ Company;Date;Category;Item;Quantity;UnitPrice;Total
                     st.error("API key gecersiz. Streamlit Secrets'taki GOOGLE_API_KEY degerini gercek ve aktif bir Gemini API key ile guncelle.")
                 elif "api key was reported as leaked" in err_lower:
                     st.error("Google API key guvenlik nedeniyle devre disi kalmis. Streamlit Secrets'ta yeni API key tanimlayip yeniden deploy etmelisin.")
+                elif "gemini_quota_exceeded" in err_lower or "quota exceeded" in err_lower or "rest http 429" in err_lower:
+                    st.error("Gemini kotasi asildi (HTTP 429). Bu key/projede su an ucretsiz istek kotasi yok. Google AI Studio/Cloud Billing'de plan ve quota ayarlarini acip yeni key ile tekrar dene.")
                 elif "latin-1" in err_lower:
                     st.error("Unicode/language kaynakli header encoding hatasi olustu. Yeni API key ile tekrar dene ve dosya adini ASCII karakterlerle yukle (or: fatura_01.jpg).")
                 else:
